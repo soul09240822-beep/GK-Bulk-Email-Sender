@@ -28,10 +28,20 @@ jobs:
             --name "GK_Bulk_Email_Sender" \
             gk_bulk_sender.py
 
-      - name: Zip .app bundle
+      - name: Create first-launch helper script
+        run: |
+          echo '#!/bin/bash' > dist/첫실행_여기클릭.command
+          echo 'DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"' >> dist/첫실행_여기클릭.command
+          echo 'xattr -cr "$DIR/GK_Bulk_Email_Sender.app"' >> dist/첫실행_여기클릭.command
+          echo 'open "$DIR/GK_Bulk_Email_Sender.app"' >> dist/첫실행_여기클릭.command
+          chmod +x dist/첫실행_여기클릭.command
+
+      - name: Zip (app + helper script only)
         run: |
           cd dist
-          zip -r GK_Bulk_Email_Sender_Mac.zip GK_Bulk_Email_Sender.app GK_Bulk_Email_Sender
+          zip -r GK_Bulk_Email_Sender_Mac.zip \
+            GK_Bulk_Email_Sender.app \
+            첫실행_여기클릭.command
 
       - name: Upload Mac artifact
         uses: actions/upload-artifact@v4
@@ -53,10 +63,10 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Build Windows exe
+      - name: Build Windows exe (single file)
         run: |
           pyinstaller `
-            --onedir `
+            --onefile `
             --windowed `
             --name "GK_Bulk_Email_Sender" `
             gk_bulk_sender.py
@@ -65,5 +75,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: GK_Bulk_Email_Sender_Windows
-          path: dist/GK_Bulk_Email_Sender/
+          path: dist/GK_Bulk_Email_Sender.exe
           retention-days: 30
