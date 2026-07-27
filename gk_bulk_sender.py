@@ -306,13 +306,42 @@ class RichEditor(tk.Frame):
         self.text.tag_config("al_center", justify="center")
         self.text.tag_config("al_right",  justify="right")
 
-        # Shortcuts
+        # Formatting shortcuts
         for key, fn in [("<Control-b>",self.bold),("<Command-b>",self.bold),
                         ("<Control-i>",self.italic),("<Command-i>",self.italic),
                         ("<Control-u>",self.under),("<Command-u>",self.under)]:
             self.text.bind(key, lambda e, f=fn: f() or "break")
 
+        # Paste — explicit for macOS Cmd+V and Windows Ctrl+V
+        self.text.bind("<Command-v>", lambda e: self._paste())
+        self.text.bind("<Control-v>", lambda e: self._paste())
+
+        # Copy / Cut
+        self.text.bind("<Command-c>", lambda e: self.text.event_generate("<<Copy>>"))
+        self.text.bind("<Control-c>", lambda e: self.text.event_generate("<<Copy>>"))
+        self.text.bind("<Command-x>", lambda e: self.text.event_generate("<<Cut>>"))
+        self.text.bind("<Control-x>", lambda e: self.text.event_generate("<<Cut>>"))
+
+        # Focus on click
+        self.text.bind("<Button-1>", lambda e: self.text.focus_set())
+
     # ── Formatting actions ─────────────────────────────────
+    def _paste(self):
+        """Paste plain text from clipboard at cursor position"""
+        try:
+            content = self.text.selection_get(selection="CLIPBOARD")
+        except:
+            try:
+                content = self.text.clipboard_get()
+            except:
+                return "break"
+        try:
+            self.text.delete("sel.first", "sel.last")
+        except:
+            pass
+        self.text.insert("insert", content)
+        return "break"
+
     def _toggle(self, tag):
         try:
             s,e = self.text.index("sel.first"), self.text.index("sel.last")
