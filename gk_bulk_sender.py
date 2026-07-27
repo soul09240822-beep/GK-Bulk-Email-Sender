@@ -795,7 +795,7 @@ class App(tk.Tk):
         """Fetch HTML from URL and use as email body"""
         win = tk.Toplevel(self)
         win.title("Load Content from URL")
-        win.geometry("620x200")
+        win.geometry("680x260")
         win.configure(bg=WHITE)
         win.grab_set()
 
@@ -808,21 +808,46 @@ class App(tk.Tk):
         url_entry.pack(fill="x", padx=24)
         url_entry.focus()
 
-        info = tk.Label(win, bg=WHITE, fg=MUTED, font=F_XS, anchor="w",
-                       text="The page's HTML will be used directly as the email body. "
-                            "{{VARIABLES}} inside the HTML will still be replaced per recipient.")
-        info.pack(fill="x", padx=24, pady=(6,0))
+        tk.Label(win, bg=WHITE, fg=MUTED, font=F_XS, anchor="w", justify="left",
+                text="✅ Works: Regular websites, Canva published links, Google Docs published links\n"
+                     "❌ Does NOT work: Google Drive sharing links (drive.google.com/file/...)\n"
+                     "   → For Google Docs: File → Share → Publish to web → Copy the link"
+                ).pack(fill="x", padx=24, pady=(8,0))
 
         def fetch():
             url = url_var.get().strip()
             if not url.startswith("http"):
-                messagebox.showwarning("Invalid URL","URL must start with http:// or https://")
+                messagebox.showwarning("Invalid URL", "URL must start with http:// or https://")
                 return
+
+            # Detect Google Drive sharing URLs
+            if "drive.google.com/file/" in url:
+                messagebox.showwarning("Google Drive Link",
+                    "Google Drive sharing links cannot be fetched as HTML.\n\n"
+                    "Instead, try:\n"
+                    "• Google Docs: File → Share → Publish to web\n"
+                    "• Canva: Share → Publish to web\n"
+                    "• Or paste your HTML content directly into the editor")
+                return
+
             try:
                 import urllib.request
-                req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-                with urllib.request.urlopen(req, timeout=15) as r:
+                import ssl
+
+                # Fix SSL certificate issue on macOS
+                ctx = ssl.create_default_context()
+                try:
+                    import certifi
+                    ctx = ssl.create_default_context(cafile=certifi.where())
+                except ImportError:
+                    ctx.check_hostname = False
+                    ctx.verify_mode = ssl.CERT_NONE
+
+                req = urllib.request.Request(url,
+                      headers={"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)"})
+                with urllib.request.urlopen(req, timeout=15, context=ctx) as r:
                     html = r.read().decode("utf-8", errors="replace")
+
                 self._html_override = html
                 self._editor.set_text(
                     f"✅ HTML content loaded from:\n{url}\n\n"
