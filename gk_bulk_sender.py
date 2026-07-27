@@ -661,14 +661,14 @@ class App(tk.Tk):
         tk.Label(bl, text="  ⌘/Ctrl+B = Bold  ·  ⌘/Ctrl+I = Italic  ·  ⌘/Ctrl+U = Underline",
                 font=F_XS, bg=LIGHT, fg=MUTED).pack(side="left", padx=12)
 
-        # Rich text editor
-        self._editor = RichEditor(outer, height=15)
-        self._editor.pack(fill="both", expand=True, pady=(6,12))
-
-        # Signature
+        # Signature — pinned to bottom, always visible
         sig = tk.LabelFrame(outer, text="  ✍  Email Signature  ", font=F_LGB,
                             bg=WHITE, fg=DARK, bd=1, relief="solid", padx=18, pady=12)
-        sig.pack(fill="x")
+        sig.pack(fill="x", side="bottom", pady=(10,0))
+
+        # Rich text editor — sits above signature
+        self._editor = RichEditor(outer, height=12)
+        self._editor.pack(fill="both", expand=True, pady=(6,4))
 
         r0 = tk.Frame(sig, bg=WHITE); r0.pack(fill="x", pady=(0,6))
         self._sig_on = tk.BooleanVar(value=False)
