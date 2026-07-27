@@ -430,6 +430,28 @@ class App(tk.Tk):
         self._build_nb()
         self._populate()
 
+        # ── Global clipboard shortcuts (works in ALL fields) ──
+        for keys, event in [
+            (["<Command-v>","<Control-v>"], "<<Paste>>"),
+            (["<Command-c>","<Control-c>"], "<<Copy>>"),
+            (["<Command-x>","<Control-x>"], "<<Cut>>"),
+            (["<Command-a>","<Control-a>"], "<<SelectAll>>"),
+            (["<Command-z>","<Control-z>"], "<<Undo>>"),
+        ]:
+            for key in keys:
+                self.bind_all(key, lambda e, ev=event: self._clipboard_act(e, ev))
+
+    def _clipboard_act(self, event, virtual_event):
+        """Route clipboard shortcuts to the focused widget"""
+        w = event.widget
+        # RichEditor Text widget handles its own paste via widget-level binding
+        # (returns "break" so this won't fire for it) — handle everything else here
+        try:
+            w.event_generate(virtual_event)
+        except Exception:
+            pass
+        return "break"
+
     # ── Header ────────────────────────────────────────────
     def _build_header(self):
         h = tk.Frame(self, bg=DARK, height=64)
@@ -689,14 +711,15 @@ class App(tk.Tk):
         # Load buttons
         br = tk.Frame(inner, bg=LIGHT); br.pack(fill="x", pady=(0,6))
         for lbl, cmd in [
+            ("📂 Load .html file",         self._ld_html),
             ("📄 Load .rtfd (macOS only)", self._ld_rtfd),
             ("📄 Load .txt",               self._ld_txt),
             ("🌐 Load from URL",           self._ld_url),
             ("🗑  Clear Body",             self._clear_body),
         ]:
             tk.Button(br, text=lbl, font=F_SM, bd=1, relief="solid",
-                     bg=WHITE, cursor="hand2", padx=12, pady=5, command=cmd
-                     ).pack(side="left", padx=(0,8))
+                     bg=WHITE, cursor="hand2", padx=10, pady=5, command=cmd
+                     ).pack(side="left", padx=(0,6))
 
         # URL status bar
         self._url_bar = tk.Frame(inner, bg="#e3f2fd", bd=1, relief="solid")
@@ -775,6 +798,25 @@ class App(tk.Tk):
             "\n"
             "─────────────────────────")
         self._sig_txt.pack(fill="x")
+
+    def _ld_html(self):
+        """Load .html file directly as email body"""
+        p = filedialog.askopenfilename(title="Select HTML Newsletter File",
+                filetypes=[("HTML files","*.html *.htm"),("All","*.*")])
+        if not p: return
+        try:
+            html = Path(p).read_text(encoding="utf-8")
+            self._html_override = html
+            fname = Path(p).name
+            self._editor.set_text(
+                f"✅ HTML file loaded:\n{fname}\n\n"
+                "This HTML will be sent as the email body.\n"
+                "{{VARIABLES}} in the HTML will still be replaced per recipient.\n\n"
+                "Click '🗑 Clear Body' to go back to the text editor.")
+            self._url_bar.pack(fill="x", pady=(4,0))
+            self._url_lbl.config(text=f"📂 HTML file: {fname}")
+        except Exception as e:
+            messagebox.showerror("Error", str(e))
 
     def _ld_rtfd(self):
         p = filedialog.askopenfilename(title="Select .rtfd",
