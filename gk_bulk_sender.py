@@ -396,6 +396,7 @@ class App(tk.Tk):
         self.cfg  = load_cfg()
         self._run = False
         self._cols: list[str] = []
+        self._html_override: str | None = None   # HTML fetched from URL
         self._build_header()
         self._build_nb()
         self._populate()
@@ -635,15 +636,25 @@ class App(tk.Tk):
                  ).pack(side="left", fill="x", expand=True)
 
         # Load buttons
-        br = tk.Frame(outer, bg=LIGHT); br.pack(fill="x", pady=(0,10))
+        br = tk.Frame(outer, bg=LIGHT); br.pack(fill="x", pady=(0,6))
         for lbl, cmd in [
             ("📄 Load .rtfd (macOS only)", self._ld_rtfd),
             ("📄 Load .txt",               self._ld_txt),
-            ("🗑  Clear Body",             lambda: self._editor.set_text("")),
+            ("🌐 Load from URL",           self._ld_url),
+            ("🗑  Clear Body",             self._clear_body),
         ]:
             tk.Button(br, text=lbl, font=F_SM, bd=1, relief="solid",
                      bg=WHITE, cursor="hand2", padx=12, pady=5, command=cmd
                      ).pack(side="left", padx=(0,8))
+
+        # URL status bar — shows when HTML is loaded from URL
+        self._url_bar = tk.Frame(outer, bg="#e3f2fd", bd=1, relief="solid")
+        self._url_lbl = tk.Label(self._url_bar, text="", font=F_XS,
+                                  bg="#e3f2fd", fg="#1565c0", anchor="w", padx=10, pady=6)
+        self._url_lbl.pack(side="left", fill="x", expand=True)
+        tk.Button(self._url_bar, text="✕ Clear", font=F_XS, bd=0, relief="flat",
+                 bg="#e3f2fd", fg="#1565c0", cursor="hand2",
+                 command=self._clear_body).pack(side="right", padx=8)
 
         # Variable pills — auto-populated when Excel is loaded
         vrow = tk.Frame(outer, bg=LIGHT); vrow.pack(fill="x", pady=(0,10))
@@ -728,6 +739,59 @@ class App(tk.Tk):
         if not p: return
         try: self._editor.set_text(Path(p).read_text(encoding="utf-8"))
         except Exception as e: messagebox.showerror("Error", str(e))
+
+    def _ld_url(self):
+        """Fetch HTML from URL and use as email body"""
+        win = tk.Toplevel(self)
+        win.title("Load Content from URL")
+        win.geometry("620x200")
+        win.configure(bg=WHITE)
+        win.grab_set()
+
+        tk.Label(win, bg=WHITE, font=F_SM, anchor="w",
+                text="Enter the URL of your newsletter / webpage:"
+                ).pack(fill="x", padx=24, pady=(20,6))
+
+        url_var = tk.StringVar()
+        url_entry = tk.Entry(win, textvariable=url_var, font=F_NORM, bd=1, relief="solid")
+        url_entry.pack(fill="x", padx=24)
+        url_entry.focus()
+
+        info = tk.Label(win, bg=WHITE, fg=MUTED, font=F_XS, anchor="w",
+                       text="The page's HTML will be used directly as the email body. "
+                            "{{VARIABLES}} inside the HTML will still be replaced per recipient.")
+        info.pack(fill="x", padx=24, pady=(6,0))
+
+        def fetch():
+            url = url_var.get().strip()
+            if not url.startswith("http"):
+                messagebox.showwarning("Invalid URL","URL must start with http:// or https://")
+                return
+            try:
+                import urllib.request
+                req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+                with urllib.request.urlopen(req, timeout=15) as r:
+                    html = r.read().decode("utf-8", errors="replace")
+                self._html_override = html
+                self._editor.set_text(
+                    f"✅ HTML content loaded from:\n{url}\n\n"
+                    "This page's HTML will be sent as the email body.\n"
+                    "{{VARIABLES}} in the HTML will still be replaced per recipient.\n\n"
+                    "Click '✕ Clear' or '🗑 Clear Body' to go back to the text editor.")
+                self._url_bar.pack(fill="x", pady=(4,0))
+                self._url_lbl.config(text=f"🌐 HTML from: {url}")
+                win.destroy()
+            except Exception as e:
+                messagebox.showerror("Error", f"Could not fetch URL:\n{e}")
+
+        tk.Button(win, text="🌐  Fetch & Load into Email Body", font=F_BOLD,
+                 bg=BLUE, fg=WHITE, relief="flat", pady=11, cursor="hand2",
+                 command=fetch).pack(fill="x", padx=24, pady=14)
+
+    def _clear_body(self):
+        self._html_override = None
+        self._editor.set_text("")
+        self._url_bar.pack_forget()
 
     def _sig_toggle(self):
         if self._sig_on.get():
@@ -885,7 +949,9 @@ class App(tk.Tk):
 
         row  = rows[0]
         subj = apply_vars(self.cfg["subject"], row)
-        body = apply_vars(self.cfg["body"],    row)
+        body = apply_vars(self.cfg["body"], row) if not self._html_override else \
+               f"[HTML from URL — opens correctly in email client]\n\nFirst 500 chars:\n" + \
+               self._html_override[:500] + "..."
 
         win = tk.Toplevel(self); win.title("Preview"); win.geometry("720x640")
         win.configure(bg=WHITE); win.grab_set()
@@ -949,8 +1015,8 @@ class App(tk.Tk):
             st = self._sig_txt.get("1.0","end-1c")
             if st: sig_html += st.replace("\n","<br>")
 
-        html_tpl  = self._editor.get_html()
-        plain_tpl = self._editor.get_plain()
+        html_tpl  = self._html_override if self._html_override else self._editor.get_html()
+        plain_tpl = self._editor.get_plain() if not self._html_override else "Please view this email in an HTML-capable email client."
 
         threading.Thread(target=self._worker,
                         args=(rows, dict(self.cfg), html_tpl, plain_tpl, sig_html),
@@ -967,7 +1033,10 @@ class App(tk.Tk):
         for i, row in enumerate(rows, 1):
             to    = test_to if test else row.get("EMAIL","")
             plain = apply_vars(plain_tpl, row)
-            html  = wrap_html(apply_vars(html_tpl, row), sig_html)
+            if self._html_override:
+                html = apply_vars(self._html_override, row)   # use fetched HTML as-is
+            else:
+                html  = wrap_html(apply_vars(html_tpl, row), sig_html)
             name  = str(row.get(cfg["pdf_col"].upper(),"")).strip()
 
             ok = send_one(cfg, row, to, plain, html)
