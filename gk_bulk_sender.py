@@ -19,12 +19,14 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
 from email import encoders
 
-try:
-    import pandas as pd
-except ImportError:
-    tk.Tk().withdraw()
-    messagebox.showerror("Missing Package", "Run:\n  pip install pandas openpyxl")
-    sys.exit(1)
+def _require_pandas():
+    try:
+        import pandas as pd
+        return pd
+    except ImportError:
+        messagebox.showerror("Missing Package",
+            "pandas not found.\n\nRun:  pip install pandas openpyxl\nthen restart the app.")
+        return None
 
 # ══════════════════════════════════════════════════════════
 #  CONSTANTS
@@ -62,7 +64,7 @@ DEFAULT_CFG = {
     "smtp_host": "", "smtp_port": "465", "smtp_ssl": True,
     "smtp_user": "", "smtp_pass": "",
     "from_name": "", "test_email": "",
-    "excel_file": "", "pdf_col": "DBA",
+    "excel_file": "", "pdf_col": "",
     "pdf_folder": "", "faq_file": "",
     "subject": "", "body": "",
     "sig_on": False, "sig_logo": "", "sig_text": "",
@@ -94,6 +96,8 @@ def save_cfg(c):
 # ══════════════════════════════════════════════════════════
 def load_merchants(excel_path, pdf_col):
     """Returns (rows:list[dict], columns:list[str], error:str|None)"""
+    pd = _require_pandas()
+    if pd is None: return None, [], "pandas not available"
     try:
         df = pd.read_excel(excel_path, dtype=str)
     except Exception as e:
@@ -563,9 +567,9 @@ class App(tk.Tk):
                 font=F_XS, bg=WHITE, fg=MUTED).pack(anchor="w")
 
         self._lbl(c1, "PDF Filename Column  (value must match the PDF filenames in your PDF folder)")
-        self._pdf_col = tk.StringVar(value="DBA")
+        self._pdf_col = tk.StringVar(value="")
         self._pdf_col_cb = ttk.Combobox(c1, textvariable=self._pdf_col, font=F_NORM,
-                                         state="normal", width=26)
+                                         state="readonly", width=26)
         self._pdf_col_cb.pack(anchor="w", pady=(0,4))
 
         c2 = self._card(inner, "📎 Attachments  (optional)")
@@ -588,11 +592,15 @@ class App(tk.Tk):
     def _load_cols(self):
         path = self._xls.get()
         if not path: return
+        pd = _require_pandas()
+        if pd is None: return
         try:
             df = pd.read_excel(path, dtype=str, nrows=1)
             cols = [c.strip().upper() for c in df.columns]
             self._cols = cols
             self._pdf_col_cb["values"] = cols
+            if self._pdf_col.get() not in cols:
+                self._pdf_col.set("")
             self._refresh_pills()
         except Exception as e:
             messagebox.showerror("Error", str(e))
@@ -695,13 +703,15 @@ class App(tk.Tk):
         tk.Label(self._sig_details,
                 text="Signature Text:  (e.g. company name · phone · website)",
                 font=F_SM, bg=WHITE, fg=MUTED, anchor="w").pack(fill="x", pady=(6,3))
-        self._sig_txt = tk.Text(self._sig_details, font=F_EDIT, height=5,
+        self._sig_txt = tk.Text(self._sig_details, font=F_EDIT, height=7,
                                 bd=1, relief="solid", padx=10, pady=8)
         self._sig_txt.insert("1.0",
             "Golden Key POS\n"
             "Tel: (xxx) xxx-xxxx\n"
             "Email: info@goldenkeypos.com\n"
-            "www.goldenkeypos.com")
+            "www.goldenkeypos.com\n"
+            "\n"
+            "─────────────────────────")
         self._sig_txt.pack(fill="x")
 
     def _ld_rtfd(self):
