@@ -598,14 +598,19 @@ class App(tk.Tk):
             messagebox.showerror("Error", str(e))
 
     def _refresh_pills(self):
-        for w in self._pframe.winfo_children(): w.destroy()
+        frames = [self._pframe]
+        if hasattr(self, "_cpills"):
+            frames.append(self._cpills)
+        for frame in frames:
+            for w in frame.winfo_children(): w.destroy()
         for col in self._cols:
             v = f"{{{{{col}}}}}"
-            tk.Button(self._pframe, text=v, font=("Courier",14,"bold"),
-                     bd=1, relief="solid", bg="#e8f4fd", cursor="hand2",
-                     padx=6, pady=3,
-                     command=lambda s=v: self._editor.insert_at_cursor(s)
-                     ).pack(side="left", padx=3, pady=3)
+            for frame in frames:
+                tk.Button(frame, text=v, font=("Courier",14,"bold"),
+                         bd=1, relief="solid", bg="#e8f4fd", cursor="hand2",
+                         padx=6, pady=3,
+                         command=lambda s=v: self._editor.insert_at_cursor(s)
+                         ).pack(side="left", padx=3, pady=3)
 
     # ════════════════════════════════════════════════════════
     #  TAB 3 — Email Content
@@ -632,6 +637,16 @@ class App(tk.Tk):
                      bg=WHITE, cursor="hand2", padx=12, pady=5, command=cmd
                      ).pack(side="left", padx=(0,8))
 
+        # Variable pills — auto-populated when Excel is loaded
+        vrow = tk.Frame(outer, bg=LIGHT); vrow.pack(fill="x", pady=(0,10))
+        tk.Label(vrow, text="Insert Variable:", font=F_SM, bg=LIGHT,
+                fg=MUTED).pack(side="left", padx=(0,10))
+        self._cpills = tk.Frame(vrow, bg=LIGHT)
+        self._cpills.pack(side="left", fill="x", expand=True)
+        tk.Label(self._cpills,
+                text="← Go to Files & Recipients tab, load your Excel file to see column variables here",
+                font=F_XS, bg=LIGHT, fg=MUTED).pack(anchor="w")
+
         # Body label + shortcut hint on same row
         bl = tk.Frame(outer, bg=LIGHT); bl.pack(fill="x")
         tk.Label(bl, text="Body:", font=F_LGB, bg=LIGHT).pack(side="left")
@@ -647,14 +662,25 @@ class App(tk.Tk):
                             bg=WHITE, fg=DARK, bd=1, relief="solid", padx=18, pady=12)
         sig.pack(fill="x")
 
-        r0 = tk.Frame(sig, bg=WHITE); r0.pack(fill="x", pady=(0,10))
+        r0 = tk.Frame(sig, bg=WHITE); r0.pack(fill="x", pady=(0,6))
         self._sig_on = tk.BooleanVar(value=False)
         tk.Checkbutton(r0, text="Include signature at bottom of every email",
-                      variable=self._sig_on, font=F_NORM, bg=WHITE).pack(side="left")
+                      variable=self._sig_on, font=F_NORM, bg=WHITE,
+                      command=self._sig_toggle).pack(side="left")
 
-        lr = tk.Frame(sig, bg=WHITE); lr.pack(fill="x", pady=(0,8))
-        tk.Label(lr, text="Logo:", font=F_SM, bg=WHITE, fg=MUTED, width=8, anchor="w"
-                 ).pack(side="left")
+        # Details frame — hidden until checkbox checked
+        self._sig_details = tk.Frame(sig, bg=WHITE)
+
+        tk.Label(self._sig_details, bg="#e8f5e9", fg="#2e7d32", font=F_SM,
+                anchor="w", padx=12, pady=10, justify="left",
+                text="💡  Logo: upload your company logo image (PNG / JPG)\n"
+                     "    Signature Text: company name, phone, address, website, etc.\n"
+                     "    Both are optional — leave blank if not needed."
+                ).pack(fill="x", pady=(0,12))
+
+        lr = tk.Frame(self._sig_details, bg=WHITE); lr.pack(fill="x", pady=(0,8))
+        tk.Label(lr, text="Logo Image:", font=F_SM, bg=WHITE, fg=MUTED,
+                 width=14, anchor="w").pack(side="left")
         self._sig_logo = tk.StringVar()
         tk.Entry(lr, textvariable=self._sig_logo, font=F_NORM, bd=1, relief="solid"
                  ).pack(side="left", fill="x", expand=True, padx=(0,8))
@@ -662,13 +688,20 @@ class App(tk.Tk):
                   cursor="hand2", padx=12,
                   command=lambda: self._sig_logo.set(
                       filedialog.askopenfilename(title="Select Logo Image",
-                          filetypes=[("Images","*.png *.jpg *.jpeg"),("All","*.*")]) or self._sig_logo.get()
+                          filetypes=[("Images","*.png *.jpg *.jpeg"),("All","*.*")]
+                      ) or self._sig_logo.get()
                   )).pack(side="left")
 
-        tk.Label(sig, text="Signature Text:", font=F_SM, bg=WHITE, fg=MUTED, anchor="w"
-                 ).pack(fill="x")
-        self._sig_txt = tk.Text(sig, font=F_EDIT, height=4,
+        tk.Label(self._sig_details,
+                text="Signature Text:  (e.g. company name · phone · website)",
+                font=F_SM, bg=WHITE, fg=MUTED, anchor="w").pack(fill="x", pady=(6,3))
+        self._sig_txt = tk.Text(self._sig_details, font=F_EDIT, height=5,
                                 bd=1, relief="solid", padx=10, pady=8)
+        self._sig_txt.insert("1.0",
+            "Golden Key POS\n"
+            "Tel: (xxx) xxx-xxxx\n"
+            "Email: info@goldenkeypos.com\n"
+            "www.goldenkeypos.com")
         self._sig_txt.pack(fill="x")
 
     def _ld_rtfd(self):
@@ -685,6 +718,12 @@ class App(tk.Tk):
         if not p: return
         try: self._editor.set_text(Path(p).read_text(encoding="utf-8"))
         except Exception as e: messagebox.showerror("Error", str(e))
+
+    def _sig_toggle(self):
+        if self._sig_on.get():
+            self._sig_details.pack(fill="x", pady=(8,0))
+        else:
+            self._sig_details.pack_forget()
 
     # ════════════════════════════════════════════════════════
     #  TAB 4 — Send
