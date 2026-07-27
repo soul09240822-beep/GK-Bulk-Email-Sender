@@ -34,6 +34,37 @@ def _require_pandas():
 APP  = "GK Bulk Email Sender"
 VER  = "v2.0"
 
+# Golden Key logo (embedded as base64)
+GK_LOGO_B64 = (
+    "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"
+)
+
 DARK   = "#1d1d1f"
 GREEN  = "#34c759"
 RED    = "#ff3b30"
@@ -456,10 +487,22 @@ class App(tk.Tk):
     def _build_header(self):
         h = tk.Frame(self, bg=DARK, height=64)
         h.pack(fill="x"); h.pack_propagate(False)
-        tk.Label(h, text=f"⚡  {APP}", font=F_TITLE, fg=WHITE, bg=DARK
-                 ).pack(side="left", padx=24, pady=16)
-        tk.Label(h, text=f"{VER}  ·  {platform.system()}", font=F_SM,
-                 fg=MUTED, bg=DARK).pack(side="right", padx=24)
+        tk.Label(h, text=f"  {APP}", font=F_TITLE, fg=WHITE, bg=DARK
+                 ).pack(side="left", padx=(16,0), pady=14)
+
+        # GK logo in top-right
+        try:
+            import base64
+            from PIL import Image, ImageTk
+            import io
+            img_data = base64.b64decode(GK_LOGO_B64)
+            img = Image.open(io.BytesIO(img_data))
+            img = img.resize((int(img.width * 36 / img.height), 36), Image.LANCZOS)
+            self._logo_img = ImageTk.PhotoImage(img)
+            tk.Label(h, image=self._logo_img, bg=DARK).pack(side="right", padx=20, pady=14)
+        except Exception:
+            tk.Label(h, text=f"{VER}", font=F_SM, fg=MUTED, bg=DARK
+                     ).pack(side="right", padx=20)
 
     # ── Notebook ──────────────────────────────────────────
     def _build_nb(self):
@@ -1067,10 +1110,33 @@ class App(tk.Tk):
 
         row  = rows[0]
         subj = apply_vars(self.cfg["subject"], row)
-        body = apply_vars(self.cfg["body"], row) if not self._html_override else \
-               f"[HTML from URL — opens correctly in email client]\n\nFirst 500 chars:\n" + \
-               self._html_override[:500] + "..."
 
+        if self._html_override:
+            import tempfile, webbrowser
+            html = apply_vars(self._html_override, row)
+            tmp = tempfile.NamedTemporaryFile(suffix=".html", delete=False,
+                                              mode="w", encoding="utf-8")
+            tmp.write(html); tmp.close()
+            webbrowser.open(f"file://{tmp.name}")
+            win = tk.Toplevel(self); win.title("Preview")
+            win.geometry("560x260"); win.configure(bg=WHITE); win.grab_set()
+            tk.Label(win, text="Preview — First Recipient", font=F_LGB, bg=WHITE
+                     ).pack(fill="x", padx=24, pady=(20,10))
+            for k, v in [("To:", row.get("EMAIL","")),
+                         ("Total:", f"{len(rows)} recipients"),
+                         ("Subject:", subj)]:
+                fr = tk.Frame(win, bg=LIGHT); fr.pack(fill="x")
+                tk.Label(fr, text=k, font=F_BOLD, bg=LIGHT, width=10, anchor="w",
+                        padx=14, pady=7).pack(side="left")
+                tk.Label(fr, text=v, font=F_NORM, bg=LIGHT, anchor="w").pack(side="left")
+            tk.Label(win, text="\n✅ HTML newsletter opened in your browser for visual preview.",
+                    font=F_SM, bg=WHITE, fg=GREEN).pack(fill="x", padx=24)
+            tk.Button(win, text="Close", font=F_LGB, command=win.destroy,
+                      bg=DARK, fg=WHITE, relief="flat", pady=10
+                      ).pack(fill="x", padx=24, pady=16)
+            return
+
+        body = apply_vars(self.cfg["body"], row)
         win = tk.Toplevel(self); win.title("Preview"); win.geometry("720x640")
         win.configure(bg=WHITE); win.grab_set()
         tk.Label(win, text="Preview — First Recipient", font=F_LGB, bg=WHITE
