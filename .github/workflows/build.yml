@@ -1,0 +1,58 @@
+name: Build GK Bulk Email Sender
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+
+  build-mac:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Build Mac app
+        run: |
+          pyinstaller \
+            --onefile \
+            --windowed \
+            --name "GK_Bulk_Email_Sender" \
+            gk_bulk_sender.py
+      - name: Zip .app bundle
+        run: |
+          cd dist
+          zip -r GK_Bulk_Email_Sender_Mac.zip GK_Bulk_Email_Sender.app
+      - name: Upload Mac artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: GK_Bulk_Email_Sender_Mac
+          path: dist/GK_Bulk_Email_Sender_Mac.zip
+          retention-days: 30
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Build Windows exe
+        run: |
+          pyinstaller `
+            --onefile `
+            --windowed `
+            --name "GK_Bulk_Email_Sender" `
+            gk_bulk_sender.py
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: GK_Bulk_Email_Sender_Windows
+          path: dist/GK_Bulk_Email_Sender.exe
+          retention-days: 30
