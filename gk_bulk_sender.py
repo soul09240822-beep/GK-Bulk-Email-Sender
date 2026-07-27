@@ -654,18 +654,40 @@ class App(tk.Tk):
     #  TAB 3 — Email Content
     # ════════════════════════════════════════════════════════
     def _build_content(self, tab):
-        outer = tk.Frame(tab, bg=LIGHT)
-        outer.pack(fill="both", expand=True, padx=18, pady=16)
+        # ── Scrollable canvas — editor stays fixed, scroll down for signature ──
+        canvas = tk.Canvas(tab, bg=LIGHT, highlightthickness=0)
+        vsb    = ttk.Scrollbar(tab, orient="vertical", command=canvas.yview)
+        canvas.configure(yscrollcommand=vsb.set)
+        vsb.pack(side="right", fill="y")
+        canvas.pack(side="left", fill="both", expand=True)
+
+        outer = tk.Frame(canvas, bg=LIGHT)
+        win_id = canvas.create_window((0, 0), window=outer, anchor="nw")
+
+        def _on_resize(e):
+            canvas.itemconfig(win_id, width=e.width)
+        canvas.bind("<Configure>", _on_resize)
+
+        outer.bind("<Configure>",
+                   lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+
+        def _scroll(e):
+            canvas.yview_scroll(int(-1 * (e.delta / 120)), "units")
+        canvas.bind_all("<MouseWheel>", _scroll)
+
+        # Pad the inner content
+        inner = tk.Frame(outer, bg=LIGHT)
+        inner.pack(fill="both", expand=True, padx=18, pady=16)
 
         # Subject row
-        sr = tk.Frame(outer, bg=LIGHT); sr.pack(fill="x", pady=(0,12))
+        sr = tk.Frame(inner, bg=LIGHT); sr.pack(fill="x", pady=(0,12))
         tk.Label(sr, text="Subject:", font=F_LGB, bg=LIGHT).pack(side="left", padx=(0,12))
         self._subj = tk.StringVar()
         tk.Entry(sr, textvariable=self._subj, font=F_NORM, bd=1, relief="solid"
                  ).pack(side="left", fill="x", expand=True)
 
         # Load buttons
-        br = tk.Frame(outer, bg=LIGHT); br.pack(fill="x", pady=(0,6))
+        br = tk.Frame(inner, bg=LIGHT); br.pack(fill="x", pady=(0,6))
         for lbl, cmd in [
             ("📄 Load .rtfd (macOS only)", self._ld_rtfd),
             ("📄 Load .txt",               self._ld_txt),
@@ -676,8 +698,8 @@ class App(tk.Tk):
                      bg=WHITE, cursor="hand2", padx=12, pady=5, command=cmd
                      ).pack(side="left", padx=(0,8))
 
-        # URL status bar — shows when HTML is loaded from URL
-        self._url_bar = tk.Frame(outer, bg="#e3f2fd", bd=1, relief="solid")
+        # URL status bar
+        self._url_bar = tk.Frame(inner, bg="#e3f2fd", bd=1, relief="solid")
         self._url_lbl = tk.Label(self._url_bar, text="", font=F_XS,
                                   bg="#e3f2fd", fg="#1565c0", anchor="w", padx=10, pady=6)
         self._url_lbl.pack(side="left", fill="x", expand=True)
@@ -685,30 +707,30 @@ class App(tk.Tk):
                  bg="#e3f2fd", fg="#1565c0", cursor="hand2",
                  command=self._clear_body).pack(side="right", padx=8)
 
-        # Variable pills — auto-populated when Excel is loaded
-        vrow = tk.Frame(outer, bg=LIGHT); vrow.pack(fill="x", pady=(0,10))
+        # Variable pills
+        vrow = tk.Frame(inner, bg=LIGHT); vrow.pack(fill="x", pady=(0,10))
         tk.Label(vrow, text="Insert Variable:", font=F_SM, bg=LIGHT,
                 fg=MUTED).pack(side="left", padx=(0,10))
         self._cpills = tk.Frame(vrow, bg=LIGHT)
         self._cpills.pack(side="left", fill="x", expand=True)
         tk.Label(self._cpills,
-                text="← Go to Files & Recipients tab, load your Excel file to see column variables here",
+                text="← Load your Excel file in Files & Recipients tab to see column variables",
                 font=F_XS, bg=LIGHT, fg=MUTED).pack(anchor="w")
 
-        # Body label + shortcut hint on same row
-        bl = tk.Frame(outer, bg=LIGHT); bl.pack(fill="x")
+        # Body label + shortcut hint
+        bl = tk.Frame(inner, bg=LIGHT); bl.pack(fill="x")
         tk.Label(bl, text="Body:", font=F_LGB, bg=LIGHT).pack(side="left")
         tk.Label(bl, text="  ⌘/Ctrl+B = Bold  ·  ⌘/Ctrl+I = Italic  ·  ⌘/Ctrl+U = Underline",
                 font=F_XS, bg=LIGHT, fg=MUTED).pack(side="left", padx=12)
 
-        # Signature — pinned to bottom, always visible
-        sig = tk.LabelFrame(outer, text="  ✍  Email Signature  ", font=F_LGB,
-                            bg=WHITE, fg=DARK, bd=1, relief="solid", padx=18, pady=12)
-        sig.pack(fill="x", side="bottom", pady=(10,0))
+        # Rich text editor — fixed height, never shrinks
+        self._editor = RichEditor(inner, height=14)
+        self._editor.pack(fill="x", pady=(6, 4))
 
-        # Rich text editor — sits above signature
-        self._editor = RichEditor(outer, height=12)
-        self._editor.pack(fill="both", expand=True, pady=(6,4))
+        # Signature — below editor, expands downward on toggle
+        sig = tk.LabelFrame(inner, text="  ✍  Email Signature  ", font=F_LGB,
+                            bg=WHITE, fg=DARK, bd=1, relief="solid", padx=18, pady=12)
+        sig.pack(fill="x", pady=(16, 0))
 
         r0 = tk.Frame(sig, bg=WHITE); r0.pack(fill="x", pady=(0,6))
         self._sig_on = tk.BooleanVar(value=False)
